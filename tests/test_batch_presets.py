@@ -69,6 +69,25 @@ def test_batch_preset_and_inline_together(client) -> None:
     assert data["results"][2]["error"]["code"] == "preset_not_found"
 
 
+def test_batch_deleted_preset_name_isolated_per_case(client) -> None:
+    # 登记后删除的档名：单条与批量都应只报该条 preset_not_found，不连累整批
+    assert client.post("/presets/tower-a", json=DEMO_CASE).status_code == 201
+    assert client.delete("/presets/tower-a").status_code == 204
+    assert client.post("/calculate", json={"preset": "tower-a"}).status_code == 404
+
+    r = client.post("/calculate/batch", json={"cases": [
+        {"preset": "tower-a"},
+        DEMO_CASE,
+        {"preset": "demo_air_water"},
+    ]})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["ok_count"] == 2 and data["failed_count"] == 1
+    results = data["results"]
+    assert not results[0]["ok"] and results[0]["error"]["code"] == "preset_not_found"
+    assert results[1]["ok"] and results[2]["ok"]
+
+
 # ---------- 工况档：登记、点名、覆盖、删除、内置保护 ----------
 def test_preset_crud_and_builtin_protection(client) -> None:
     body = {"description": "试验档", **DEMO_CASE, "Kya": 0.04}

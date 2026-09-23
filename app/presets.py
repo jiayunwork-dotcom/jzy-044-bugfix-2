@@ -161,6 +161,8 @@ class PresetRepository:
         合并结果是否自洽交由 ``validation.validate_case`` 统一判定。
         """
         with self._lock:
+            if name not in self._data:
+                raise PresetNotFoundError(f"工况档 '{name}' 未登记")
             merged: dict[str, Any] = dict(self._data[name]["params"])
         for f in CASE_FIELDS:
             v = overrides.get(f)
