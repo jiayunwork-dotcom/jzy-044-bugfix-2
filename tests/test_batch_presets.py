@@ -69,6 +69,27 @@ def test_batch_preset_and_inline_together(client) -> None:
     assert data["results"][2]["error"]["code"] == "preset_not_found"
 
 
+def test_batch_unknown_preset_isolated_per_item(client) -> None:
+    # 未登记档名单独提交时是该条 404，混进批量时也只能拖垮它自己这一条
+    solo = client.post("/calculate", json={"preset": "never_registered"})
+    assert solo.status_code == 404
+    assert solo.json()["error"]["code"] == "preset_not_found"
+
+    r = client.post("/calculate/batch", json={"cases": [
+        DEMO_CASE,                          # 0 合法（临时参数）
+        {"preset": "never_registered"},     # 1 档名未登记
+        {"preset": "demo_air_water"},       # 2 合法（点名内置档）
+    ]})
+    assert r.status_code == 200
+    data = r.json()
+    assert data["count"] == 3 and data["ok_count"] == 2 and data["failed_count"] == 1
+    results = data["results"]
+    assert results[0]["ok"] and results[2]["ok"]
+    assert not results[1]["ok"]
+    assert results[1]["error"]["code"] == "preset_not_found"
+    assert "未登记" in results[1]["error"]["message"]
+
+
 # ---------- 工况档：登记、点名、覆盖、删除、内置保护 ----------
 def test_preset_crud_and_builtin_protection(client) -> None:
     body = {"description": "试验档", **DEMO_CASE, "Kya": 0.04}
